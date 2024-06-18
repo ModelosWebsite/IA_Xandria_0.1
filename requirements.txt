@@ -7,5 +7,6 @@ bs4
 fastapi
 uvicorn
 langchain_community
-
+langchain_google_genai
 upstash_redis
+langchain_google_genai
