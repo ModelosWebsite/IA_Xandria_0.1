@@ -19,7 +19,7 @@ load_dotenv()
 app=FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5500","http://127.0.0.1:5500","http://127.0.0.1:5500/index.html"],  # Permitir apenas essa origem específica
+    allow_origins=["*"],  # Permitir apenas essa origem específica
     allow_credentials=True,
     allow_methods=["*"],  # Permitir todos os métodos HTTP
     allow_headers=["*"],  # Permitir todos os cabeçalhos
