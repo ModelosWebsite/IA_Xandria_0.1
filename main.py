@@ -62,7 +62,7 @@ async def chat(input:Prompt):
      3. A tua missão é apenas fornecer informação e nada mais
      4. Não podes exercer nenhuma actividade fora do Karamba
      
-     A
+     
      \n\n{context}"""),
     MessagesPlaceholder(variable_name="chat_history"),
     ("user", "{input}"),
