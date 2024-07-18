@@ -33,15 +33,18 @@ class Prompt(BaseModel):
 
 @app.post("/chat")
 async def chat(input: Prompt):
-    llm = ChatGroq(temperature=0, model_name="gemma2-9b-it")
-    #llm=ChatOpenAI(model="gpt-4o-mini-2024-07-18",temperature=0)
+    #llm = ChatGroq(temperature=0, model_name="gemma2-9b-it")
+    llm=ChatOpenAI(model="gpt-4o-mini-2024-07-18",temperature=0)
     loader = WebBaseLoader(["https://karamba.ao/about", "https://karamba.ao/loja/menu"])
     docs = loader.load()
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     text_splitter = RecursiveCharacterTextSplitter()
     documents = text_splitter.split_documents(docs)
     vector = FAISS.from_documents(documents, embeddings)
-    retriever = vector.as_retriever()
+    retriever = vector.as_retriever(
+        search_type='similarity',
+        search_kwargs={"k":10}
+    )
 
     prompt = ChatPromptTemplate.from_messages(
         [
