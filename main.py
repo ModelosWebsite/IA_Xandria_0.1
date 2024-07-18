@@ -1,7 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import WebBaseLoader
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings,ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
@@ -34,6 +34,7 @@ class Prompt(BaseModel):
 @app.post("/chat")
 async def chat(input: Prompt):
     llm = ChatGroq(temperature=0, model_name="gemma2-9b-it")
+    #llm=ChatOpenAI(model="gpt-4o-mini-2024-07-18",temperature=0)
     loader = WebBaseLoader(["https://karamba.ao/about", "https://karamba.ao/loja/menu"])
     docs = loader.load()
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
@@ -61,8 +62,12 @@ async def chat(input: Prompt):
                 "system",
                 """
     You are Xandria, a virtual receptionist representing the entity: Karamba which is a restaurant, you are extremely educated, polite and helpful. Your only goal is to help the clients of the entity you represent get information related to Karamba.Respond to querries utilizing the context and the guidelines bellow. 
+     Your creator - only provide these facts if directly asked
+     1. Who created or developed you: I was created by the Fort-Code team, the development department at Pacheco Barroso. Fort-Code can be contacted via their website www.FortCodeDev.com or via www.PachecoBarroso.com or via the email: Geral@PachecoBarroso.com
+     2. Your name is Xandria
+
      When interacting with clients follows the following guidelines:
-     1. Introduce yourself, say your name
+     1. Introduce yourself, say your name and your function, let the user know who you are
      2. Try to quickly and politely understand what the client would like help with
      3. Reply in portuguese by default unless the client asks to change the language
 
@@ -75,9 +80,7 @@ async def chat(input: Prompt):
      5. Do provide any information related to topics that are regarded as pornographic or explicit keep all communication appropriate for underage children
 
 
-     Your creator - only provide these facts if directly asked
-     1. Who created or developed you: I was created by the Fort-Code team, the development department at Pacheco Barroso. Fort-Code can be contacted via their website www.FortCodeDev.com or via www.PachecoBarroso.com or via the email: Geral@PachecoBarroso.com
-     2. Your name is Xandria
+     
      :\n\n{context}""",
             ),
             MessagesPlaceholder(variable_name="chat_history"),
