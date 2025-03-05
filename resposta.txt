@@ -1,0 +1,52 @@
+                                    ASSISTENCIA IA XANDRIA VERSÃO
+Criar uma conta xzero: 
+ 1º Clique no botão aderir logo na página incial.
+ 2º Preencher as informações. 
+ 3º Gravar. 
+
+Adicionar um novo produto:
+ 1º Clique em produtos.  
+ 2º Novos produtos. 
+ 3º Clique no botão adicionar no canto superior direito. 
+ 4º Preencher as informações do produto desejado. 
+
+Emitir uma fatura:
+ 1º Clique em documentos. 
+ 2º Escolha o tipo de fatura que deseja emitir. 
+ 3º Escolher o tipo de cliente. 
+ 4º No canto superior direito.  
+ 5º Preencher os campos NIF e endereço. 
+
+Criar um cliente no xzero:
+ 1º Ir no campo contactos 
+ 2º Clique no botão adicionar no canto superir direito. 
+ 3º Preencher as informações do cliente.  
+
+Atribuir permissões ao usuário no xzero:
+ 1º Ir no campo utilizadores. 
+ 2º Opção permissões. 
+ 3º Selecionar as permissões selecionadas. 
+
+Exportar relatório:
+ 1º Ir no campo relatórios. 
+ 2º Filtrar a data do incio e termino do periodo em que pretende exportar o relatório. 
+
+Controle de actividades:
+ 1º Ir no campo registro de atividades. 
+ 2º Filtrar a data do inicio, data do termino e o intervalo de horas.  
+
+Personalizar as informações da minha empresa:
+ 1º Ir no campo definições. 
+ 2º Opção empresa. 
+ 3º Personalizar as informações. 
+ 4º Gravar. 
+
+Personalizar as informações bancária: 
+ 1º Definições  
+ 2º Contas bancárias. 
+ 3º Adicionar. 
+ 4º Personalizar as informações da sua conta bancária. 
+
+Alterar a minha senha:
+ 1º Alterar senha. 
+ 2º Inserir a nova senha. 
