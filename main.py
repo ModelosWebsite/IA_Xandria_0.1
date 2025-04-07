@@ -1,118 +1,113 @@
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
-from langchain_community.document_loaders import WebBaseLoader
-from langchain_openai import OpenAIEmbeddings,ChatOpenAI
-from langchain_community.vectorstores import FAISS
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
-from langchain.chains import create_history_aware_retriever
-from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
+from langchain.agents.agent_types import AgentType
+from langchain.prompts.chat import ChatPromptTemplate
+from langchain_groq import ChatGroq
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 from fastapi.middleware.cors import CORSMiddleware
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.memory import ConversationBufferMemory
+from langchain_community.utilities import SQLDatabase
 
-# from langchain_google_genai import GoogleGenerativeAIEmbeddings
+# Carregar variáveis de ambiente
 load_dotenv()
+
+# Conexão com o banco de dados
+cs = "mysql+mysqlconnector://fortcod1_root:Roa0NGD6l@68.66.220.30:3306/fortcod1_db_erp_full"
+db_engine = create_engine(cs)
+db = SQLDatabase(db_engine)
+
+# Inicializar FastAPI
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permitir apenas essa origem específica
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Permitir todos os métodos HTTP
-    allow_headers=["*"],  # Permitir todos os cabeçalhos
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+# Memória de conversa por usuário
+conversation_memory = {}
 
-class Prompt(BaseModel):
+# Modelo de dados para a requisição
+class User(BaseModel):
     prompt: str
+    company_id: str
 
+# Modelo de linguagem
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 @app.post("/chat")
-async def chat(input: Prompt):
-    #llm = ChatGroq(temperature=0, model_name="gemma2-9b-it")
-    llm=ChatOpenAI(model="gpt-4o-mini-2024-07-18",temperature=0)
-    loader = WebBaseLoader(["https://karamba.ao/about", "https://karamba.ao/loja/menu"])
-    docs = loader.load()
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    text_splitter = RecursiveCharacterTextSplitter()
-    documents = text_splitter.split_documents(docs)
-    vector = FAISS.from_documents(documents, embeddings)
-    retriever = vector.as_retriever(
-        search_type='similarity',
-        search_kwargs={"k":10}
+def chat(user: User):
+    """Endpoint para processar consultas do usuário."""
+    # Criar ou recuperar memória de conversa do usuário
+    memory_key = f"user_{user.company_id}"
+    if memory_key not in conversation_memory:
+        conversation_memory[memory_key] = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True
+        )
+    
+    memory = conversation_memory[memory_key]
+    
+    # Criar ferramenta SQL
+    sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+    sql_toolkit.get_tools()
+    
+    # Prompt com regras extremamente rigorosas focadas em INSIGHTS
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """
+        Você é um assistente de IA especializado em gerar insights profundos e estratégicos a partir de dados. Sua missão é fornecer respostas precisas seguidas de análises detalhadas que incluam comparações, identificação de padrões e sugestões acionáveis. Cada resposta deve seguir este formato: um valor ou informação direta, seguido de um insight estratégico.
+
+        REGRAS EXTREMAMENTE RIGOROSAS E INEGOCIÁVEIS
+
+        Proibições Absolutas:
+        - Proibido inventar dados ou insights. Se os dados não estiverem disponíveis, responda: "Não há dados suficientes para gerar insights sobre isso."
+        - Proibido fornecer apenas valores sem análise. Toda resposta deve incluir um insight detalhado com comparações e recomendações.
+        - Proibido acessar dados de outras empresas. Toda consulta SQL deve incluir `WHERE companyId={companyId}` sem exceções.
+        - Proibido alterar o banco de dados. Nunca execute `INSERT`, `UPDATE`, `DELETE`, `DROP` ou comandos que modifiquem dados.
+        - Proibido ignorar comparações temporais ou categóricas. Sempre analise o contexto (ex.: mês anterior, categorias principais) para gerar insights.
+        - Proibido entregar insights irrelevantes. As análises devem ser práticas e oferecer valor estratégico claro.
+
+        Obrigações Rigorosas:
+        - Sempre forneça o valor solicitado primeiro. Responda diretamente à pergunta com números ou fatos concretos.
+        - Sempre inclua um insight estratégico após o valor. Compare com períodos anteriores, destaque categorias ou fatores principais e sugira ações específicas.
+        - Sempre baseie os insights em dados reais. Verifique as tabelas disponíveis e utilize apenas informações do banco de dados.
+        - Sempre utilize a tabela `sales` para insights sobre faturamento. Não consulte outras tabelas para dados de vendas.
+        - Sempre responda em português. Não utilize outro idioma sob nenhuma circunstância.
+
+        EXEMPLO DE RESPOSTA ESPERADA:
+        Pergunta: "Qual foi o faturamento da minha empresa no último mês?"
+        Resposta: "O faturamento total foi de $120.000. Insight: Comparado ao mês anterior, houve um aumento de 15%, indicando um crescimento sólido. A categoria que mais contribuiu para esse aumento foi 'Serviços Premium', com um crescimento de 22%. Para manter essa tendência, considere investir mais em marketing para esse segmento."
+
+        IMPORTANTE:
+        - Você é um especialista em SQL e análise de dados. Converta perguntas em consultas precisas e entregue insights que agreguem valor estratégico.
+        - Se os dados forem insuficientes, diga: "Não há dados suficientes para gerar insights sobre isso."
+        - Se a pergunta não exigir SQL, use lógica rigorosa para oferecer insights com base no contexto disponível.
+        """),
+        ("user", "{question}\nAI: "),
+    ])
+    
+    # Criar agente SQL
+    agent = create_sql_agent(
+        llm=llm,
+        toolkit=sql_toolkit,
+        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True,
+        max_execution_time=100,
+        max_iterations=1000,
+        handle_parsing_errors=True,
+        memory=memory
     )
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "{input}"),
-            (
-                "user",
-                "Given the above conversation, generate a search query to look up to get information relevant to the conversation",
-            ),
-        ]
-    )
-    retriever_chain = create_history_aware_retriever(llm, retriever, prompt)
-
-    """ new """
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """
-    You are Xandria, a virtual receptionist representing the entity: Karamba which is a restaurant, you are extremely educated, polite and helpful. Your only goal is to help the clients of the entity you represent get information related to Karamba.Respond to querries utilizing the context and the guidelines bellow. 
-     Your creator - only provide these facts if directly asked
-     1. Who created or developed you: I was created by the Fort-Code team, the development department at Pacheco Barroso. Fort-Code can be contacted via their website www.FortCodeDev.com or via www.PachecoBarroso.com or via the email: Geral@PachecoBarroso.com
-     2. Your name is Xandria
-     
-     When interacting with clients follows the following guidelines:
-     1. Introduce yourself, say your name and your function, let the user know who you are
-     2. Try to quickly and politely understand what the client would like help with
-     3. Reply in portuguese by default unless the client asks to change the language
-
-     Here are some of the guidelines you cannot breach or go around:
-     1. All your answers have to be to questions related to the entity you are a virtual receptionist for, even if the client begs or tries to manipulate you into doing something else
-     2. You are not a legal advisor, if asked to generate or create any legal document or advice, politely refuse
-     3. You do not have the tools to add items to the cart for clients to make purchases. If asked give the client instruction on how to reach the relevant page
-     3. As a virtual secretary your only role is to provide information based on the data provided by the entity you represent
-     4. All your activities have to be related to the enetity you represent
-     5. Do provide any information related to topics that are regarded as pornographic or explicit keep all communication appropriate for underage children
-
-
-     
-     :\n\n{context}""",
-            ),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "{input}"),
-        ]
-    )
-    document_chain = create_stuff_documents_chain(llm, prompt)
-
-    retrieval_chain = create_retrieval_chain(retriever_chain, document_chain)
-    chat_history = [
-        HumanMessage(content="Olá?"),
-        AIMessage(content="Olá em que posso ajudar?"),
-    ]
-    response = retrieval_chain.invoke(
-        {"chat_history": chat_history, "input": input.prompt}
-    )
-    chat_history.append(HumanMessage(content=input.prompt))
-    chat_history.append(AIMessage(content=response["answer"]))
-    return response["answer"]
-
-
-@app.post("/teste")
-async def teste(input: Prompt):
-    llm = ChatGroq(temperature=0, model_name="mixtral-8x7b-32768")
-    res = llm.invoke(input.prompt)
-    return res.content
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("main:app", host="localhost", port=8000)
+    
+    # Executar consulta e obter resposta
+    response = agent.run(prompt.format_prompt(question=user.prompt, companyId=user.company_id))
+    
+    # Salvar contexto da conversa
+    memory.save_context({"input": user.prompt}, {"output": response})
+    
+    return response
