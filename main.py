@@ -82,12 +82,6 @@ def chat(user: User):
 
         **INTERPRETAÇÃO:** o usuário quer o volume total de vendas no mês atual. A métrica correta é a contagem de registros na tabela `sales`.  
 
-        **Query SQL gerada:**  
-        ```sql
-        SELECT COUNT(*) AS total_vendas 
-        FROM sales 
-        WHERE companyId={companyId} AND MONTH(data_venda) = MONTH(NOW()) AND YEAR(data_venda) = YEAR(NOW());
-        ```  
 
         **RESPOSTA DO INSIGHT:**  
         "A empresa realizou 215 vendas neste mês. Comparado ao mês passado, houve um crescimento de 12%. Isso indica uma tendência positiva, mas recomenda-se analisar o ticket médio e a margem de lucro para entender a sustentabilidade desse crescimento."  
