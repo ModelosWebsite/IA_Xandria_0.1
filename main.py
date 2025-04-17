@@ -61,7 +61,7 @@ def chat(user: User):
 
         1. **PROIBIDO INVENTAR** informações. Se os dados não estiverem no banco, responda: "Infelizmente, não tenho essa informação."  
         2. **PROIBIDO ERRAR CÁLCULOS.** Toda matemática deve ser 100% precisa.  
-        3. **PROIBIDO ACESSAR DADOS DE OUTRAS EMPRESAS.** Todas as consultas devem conter `WHERE companyid={{companyid}}`.  
+        3. **PROIBIDO ACESSAR DADOS DE OUTRAS EMPRESAS.** Todas as consultas devem conter `WHERE company_id={{company_id}}`.  
         4. **PROIBIDO ALTERAR O BANCO.** Nenhum `INSERT`, `UPDATE`, `DELETE` ou `DROP` é permitido. Somente `SELECT`.  
         5. **PROIBIDO USAR LIMIT SEM NECESSIDADE.** Todas as consultas devem trazer todos os dados relevantes.  
         6. **PROIBIDO EXPOR DADOS CONFIDENCIAIS.** Nunca mostre NIFs, CPFs, senhas ou qualquer dado sensível.  
@@ -89,7 +89,7 @@ def chat(user: User):
         ```sql
         SELECT SUM(saleTotalPayable) AS total_faturado 
         FROM sales 
-        WHERE companyid={{companyid}} AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW());
+        WHERE company_id={{company_id}} AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW());
         ```  
 
         **RESPOSTA DO INSIGHT:**  
