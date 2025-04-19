@@ -11,7 +11,12 @@ from langchain_openai import ChatOpenAI
 from fastapi.middleware.cors import CORSMiddleware
 from langchain.memory import ConversationBufferMemory
 from langchain_community.utilities import SQLDatabase
+from langchain.vectorstores import FAISS
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.chains import RetrievalQA
 import pymysql
+import re
+import os
 
 load_dotenv()
 
@@ -39,6 +44,24 @@ class User(BaseModel):
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
+# Vetorização e FAISS com os metadados por empresa
+faiss_db = FAISS.load_local("faiss_index", OpenAIEmbeddings(), allow_dangerous_deserialization=True)
+retriever = faiss_db.as_retriever(search_kwargs={"k": 5})
+
+retrieval_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=retriever,
+    return_source_documents=True,
+    chain_type="stuff"
+)
+
+def validar_query_sql(sql: str, company_id: str):
+    if f"company_id = {company_id}" not in sql and f"company_id='{company_id}'" not in sql:
+        raise ValueError("A query SQL não contém o filtro obrigatório de company_id!")
+    if re.search(r"\\b(INSERT|UPDATE|DELETE|DROP|ALTER)\\b", sql, re.IGNORECASE):
+        raise ValueError("Operações perigosas detectadas na query SQL!")
+    return True
+
 @app.post("/chat")
 def chat(user: User):
     memory_key = f"user_{user.company_id}"
@@ -55,53 +78,47 @@ def chat(user: User):
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", f"""
-        Você é um assistente de IA altamente especializado em:
-        - Consultas SQL rigorosas e verdadeiras;
-        - Cálculos matemáticos e estatísticos absolutamente corretos;
-        - Geração de insights organizados e com base em dados reais do banco.
+        Você é um assistente de IA extremamente rigoroso, especializado em consultas SQL precisas, cálculos matemáticos e estatísticos exatos e geração de insights estratégicos com base apenas em dados reais do banco.
 
-        === REGRAS INVIOLÁVEIS ===
-        1. NUNCA invente dados. Se não houver informação no banco, diga claramente: "Infelizmente, não tenho essa informação.".
-        2. NUNCA acesse dados de outras empresas. Sempre filtre com `WHERE company_id={{company_id}}`.
-        3. NUNCA execute ações que alterem o banco. Apenas `SELECT` é permitido. Nada de `INSERT`, `UPDATE`, `DELETE`, `DROP`.
-        4. NUNCA exponha dados sensíveis como NIF, CPF, senhas, etc.
-        5. Cálculos devem ser 100% matematicamente corretos: médias, somas, desvios, proporções, percentuais, etc.
-        6. Estatísticas devem ser precisas e verificáveis a partir do banco.
-        7. Sempre responda com base na consulta SQL gerada.
-        8. Organize bem as respostas: use parágrafos claros, com explicações detalhadas e bem estruturadas.
-        9. Nunca use LIMIT sem necessidade — traga todos os dados relevantes.
-        10. Sempre responda em português técnico e direto.
+        **REGRAS ABSOLUTAS:**
 
-        === SOBRE O BANCO ===
-        - A data das faturas está em `created_at` na tabela `sales`.
-        - O valor líquido de cada fatura está em `saleTotalPayable`.
+        1. **PROIBIDO INVENTAR.** Só use informações que estejam no banco de dados. Se não existir, diga: "Infelizmente, não tenho essa informação."  
+        2. **CÁLCULOS EXATOS.** Toda matemática deve ser precisa. Use funções agregadas corretamente: `SUM`, `AVG`, `COUNT`, etc.  
+        3. **company_id OBRIGATÓRIO.** Toda query deve conter `WHERE company_id = '{{companyId}}'`. Isso é obrigatório para todas as empresas.  
+        4. **SOMENTE SELECT.** Não gere queries de modificação. Proibido `INSERT`, `UPDATE`, `DELETE`, `DROP`.  
+        5. **DADOS CONFIDENCIAIS PROTEGIDOS.** Não exponha CPF, NIF, senhas ou qualquer dado sensível.  
+        6. **CONSULTAS CLARAS.** Organize sempre as respostas em parágrafos e explique o que cada parte significa.  
+        7. **INSIGHTS INTELIGENTES.** Após apresentar os dados, interprete com um pequeno insight estratégico e objetivo.  
 
-        === MODELO DE RESPOSTA ===
+        **DADOS RELEVANTES:**
+        - O valor total das faturas está na coluna `saleTotalPayable`, na tabela `sales`.  
+        - A data de emissão da fatura está na coluna `created_at`, na tabela `sales`.
 
-        **Pergunta do usuário:**
-        "Qual foi o total faturado neste mês?"
+        **EXEMPLO DE PERGUNTA E RESPOSTA:**
 
-        **INTERPRETAÇÃO:**
-        O usuário deseja saber a soma de todas as faturas líquidas emitidas neste mês.
+        **Pergunta:** Qual o total faturado neste mês?
+
+        **INTERPRETAÇÃO:** O usuário quer saber o total de vendas considerando o valor líquido (`saleTotalPayable`) no mês atual. 
 
         **Query SQL gerada:**
         ```sql
         SELECT SUM(saleTotalPayable) AS total_faturado 
         FROM sales 
-        WHERE company_id={{company_id}} AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW());
+        WHERE company_id={{companyId}} AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW());
         ```
 
-        **INSIGHT ORGANIZADO:**
-        O total faturado pela empresa neste mês foi de **8.950.000 AKZ**. 
+        **RESPOSTA:**
+        O total faturado neste mês foi de 9.800.000 AKZ. Esse número indica estabilidade em relação ao mês anterior, sugerindo que a empresa está mantendo um desempenho consistente.
 
-        Isso demonstra uma performance de vendas significativa no período atual. 
-        Se compararmos com meses anteriores (quando disponíveis), é possível avaliar tendências, sazonalidades ou impactos de estratégias comerciais recentes.
-
-        **IMPORTANTE:**
-        Se algum dado não existir ou não puder ser encontrado, diga: "Infelizmente, não tenho essa informação.".
+        Nunca forneça dados genéricos, apenas os reais do banco. Organize a resposta em parágrafos claros.
         """),
-        ("user", "{question}\\n\nai:")
+        ("user", "{question}\\nIA:"),
     ])
+
+    formatted_prompt = prompt.format_prompt(
+        question=user.prompt,
+        companyId=user.company_id
+    )
 
     agent = create_sql_agent(
         llm=llm,
@@ -114,8 +131,7 @@ def chat(user: User):
         memory=memory
     )
 
-    response = agent.run(prompt.format_prompt(question=user.prompt, company_id=user.company_id))
-
+    response = agent.run(formatted_prompt)
     memory.save_context({"input": user.prompt}, {"output": response})
 
     return response
