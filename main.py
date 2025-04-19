@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain.agents import create_sql_agent
-from langchain.agents.agent_toolkits import SQLDatabaseToolkit
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
 from langchain.agents.agent_types import AgentType
 from langchain.prompts.chat import ChatPromptTemplate
 from langchain_groq import ChatGroq
@@ -11,12 +11,7 @@ from langchain_openai import ChatOpenAI
 from fastapi.middleware.cors import CORSMiddleware
 from langchain.memory import ConversationBufferMemory
 from langchain_community.utilities import SQLDatabase
-from langchain.vectorstores import FAISS
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.chains import RetrievalQA
 import pymysql
-import re
-import os
 
 load_dotenv()
 
@@ -44,23 +39,6 @@ class User(BaseModel):
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-faiss_db = FAISS.load_local("faiss_index", OpenAIEmbeddings(), allow_dangerous_deserialization=True)
-retriever = faiss_db.as_retriever(search_kwargs={"k": 5})
-
-retrieval_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    return_source_documents=True,
-    chain_type="stuff"
-)
-
-def validar_query_sql(sql: str, company_id: str):
-    if f"company_id = {company_id}" not in sql and f"company_id='{company_id}'" not in sql:
-        raise ValueError("A query SQL não contém o filtro obrigatório de company_id!")
-    if re.search(r"\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b", sql, re.IGNORECASE):
-        raise ValueError("Operações perigosas detectadas na query SQL!")
-    return True
-
 @app.post("/chat")
 def chat(user: User):
     memory_key = f"user_{user.company_id}"
@@ -77,49 +55,52 @@ def chat(user: User):
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", f"""
-        Você é um assistente de IA extremamente rigoroso, especializado em consultas SQL precisas, cálculos matemáticos e estatísticos exatos e geração de insights estratégicos com base apenas em dados reais do banco.
+        Você é um assistente de IA especialista em:
+        - Consultas SQL corretas e seguras;
+        - Cálculos matemáticos e estatísticos precisos;
+        - Geração de análises claras e confiáveis com base em dados reais do banco.
 
-        **REGRAS ABSOLUTAS:**
+        === REGRAS RÍGIDAS E OBRIGATÓRIAS ===
+        1. NUNCA invente informações. Se os dados não existirem, responda: "Infelizmente, não tenho essa informação.".
+        2. SEMPRE filtre as consultas por `WHERE company_id={{company_id}}`.
+        3. NUNCA execute comandos que alterem dados (ex: INSERT, UPDATE, DELETE, DROP).
+        4. NÃO exponha dados sensíveis (ex: NIF, senhas, CPF).
+        5. SEJA UM GÊNIO EM MATEMÁTICA: seus cálculos devem ser perfeitos — somas, médias, desvios, percentuais, comparações, etc.
+        6. NUNCA alucine. Toda resposta precisa vir diretamente do banco de dados.
+        7. SEMPRE apresente a consulta SQL utilizada na resposta.
+        8. ORGANIZE A RESPOSTA COM CLAREZA:
+           - Título em negrito (**)
+           - Explicação detalhada e bem estruturada
+           - Linguagem técnica e profissional
+        9. Não utilize `LIMIT` a menos que seja solicitado.
+        10. Nunca generalize ou invente tendências — baseie-se nos dados consultados.
 
-        1. **PROIBIDO INVENTAR.** Só use informações que estejam no banco de dados. Se não existir, diga: \"Infelizmente, não tenho essa informação.\"  
-        2. **CÁLCULOS EXATOS.** Toda matemática deve ser precisa. Use funções agregadas corretamente: `SUM`, `AVG`, `COUNT`, etc.  
-        3. **company_id OBRIGATÓRIO.** Toda query deve conter `WHERE company_id = '{{companyId}}'`. Isso é obrigatório para todas as empresas.  
-        4. **SOMENTE SELECT.** Não gere queries de modificação. Proibido `INSERT`, `UPDATE`, `DELETE`, `DROP`.  
-        5. **DADOS CONFIDENCIAIS PROTEGIDOS.** Não exponha CPF, NIF, senhas ou qualquer dado sensível.  
-        6. **CONSULTAS CLARAS.** Organize sempre as respostas em parágrafos e explique o que cada parte significa. Respostas com múltiplos dados devem ser organizadas em parágrafos distintos, um para cada item.  
-        7. **INSIGHTS INTELIGENTES.** Após apresentar os dados, interprete com um pequeno insight estratégico e objetivo.  
+        === ESTRUTURA RECOMENDADA DE RESPOSTA ===
 
-        **DADOS RELEVANTES:**
-        - O valor total das faturas está na coluna `saleTotalPayable`, na tabela `sales`.  
-        - A data de emissão da fatura está na coluna `created_at`, na tabela `sales`.
+        **Pergunta do usuário:**
+        "Qual foi o total faturado neste mês?"
 
-        **EXEMPLO DE PERGUNTA E RESPOSTA:**
+        **Interpretação:**
+        O usuário deseja saber o valor total líquido das faturas emitidas no mês atual.
 
-        **Pergunta:** Qual o total faturado neste mês?
-
-        **INTERPRETAÇÃO:** O usuário quer saber o total de vendas considerando o valor líquido (`saleTotalPayable`) no mês atual. 
-
-        **Query SQL gerada:**
+        **Consulta SQL utilizada:**
         ```sql
         SELECT SUM(saleTotalPayable) AS total_faturado 
         FROM sales 
-        WHERE company_id={{companyId}} AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW());
+        WHERE company_id={{company_id}} 
+          AND MONTH(created_at) = MONTH(NOW()) 
+          AND YEAR(created_at) = YEAR(NOW());
         ```
 
-        **RESPOSTA:**
-        O total faturado neste mês foi de 9.800.000 AKZ. 
-        
-        Esse número indica estabilidade em relação ao mês anterior, sugerindo que a empresa está mantendo um desempenho consistente.
+        **Resposta organizada:**
+        O total faturado pela empresa no mês atual é de **8.950.000 AKZ**. Esse valor representa a soma de todas as faturas líquidas emitidas nesse período.
 
-        Nunca forneça dados genéricos, apenas os reais do banco. Organize a resposta em parágrafos claros.
+        Este resultado pode ser usado para comparações com meses anteriores, auxiliando na análise de desempenho financeiro, sazonalidade e impacto de estratégias de vendas.
+
+        **Nota:** Se não houver registros para o período, responda claramente que não há dados disponíveis.
         """),
-        ("user", "{question}\\nIA:"),
+        ("user", "{question}\nai:")
     ])
-
-    formatted_prompt = prompt.format_prompt(
-        question=user.prompt,
-        companyId=user.company_id
-    )
 
     agent = create_sql_agent(
         llm=llm,
@@ -132,7 +113,7 @@ def chat(user: User):
         memory=memory
     )
 
-    response = agent.run(formatted_prompt)
+    response = agent.run(prompt.format_prompt(question=user.prompt, company_id=user.company_id))
     memory.save_context({"input": user.prompt}, {"output": response})
 
     return response
