@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain_community.agent_toolkits.sql.base import create_sql_agent
-from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
+from langchain.agents import create_sql_agent
+from langchain.agents.agent_toolkits import SQLDatabaseToolkit
 from langchain.agents.agent_types import AgentType
 from langchain.prompts.chat import ChatPromptTemplate
 from langchain_groq import ChatGroq
@@ -44,7 +44,6 @@ class User(BaseModel):
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-# Vetorização e FAISS com os metadados por empresa
 faiss_db = FAISS.load_local("faiss_index", OpenAIEmbeddings(), allow_dangerous_deserialization=True)
 retriever = faiss_db.as_retriever(search_kwargs={"k": 5})
 
@@ -58,7 +57,7 @@ retrieval_chain = RetrievalQA.from_chain_type(
 def validar_query_sql(sql: str, company_id: str):
     if f"company_id = {company_id}" not in sql and f"company_id='{company_id}'" not in sql:
         raise ValueError("A query SQL não contém o filtro obrigatório de company_id!")
-    if re.search(r"\\b(INSERT|UPDATE|DELETE|DROP|ALTER)\\b", sql, re.IGNORECASE):
+    if re.search(r"\b(INSERT|UPDATE|DELETE|DROP|ALTER)\b", sql, re.IGNORECASE):
         raise ValueError("Operações perigosas detectadas na query SQL!")
     return True
 
@@ -82,12 +81,12 @@ def chat(user: User):
 
         **REGRAS ABSOLUTAS:**
 
-        1. **PROIBIDO INVENTAR.** Só use informações que estejam no banco de dados. Se não existir, diga: "Infelizmente, não tenho essa informação."  
+        1. **PROIBIDO INVENTAR.** Só use informações que estejam no banco de dados. Se não existir, diga: \"Infelizmente, não tenho essa informação.\"  
         2. **CÁLCULOS EXATOS.** Toda matemática deve ser precisa. Use funções agregadas corretamente: `SUM`, `AVG`, `COUNT`, etc.  
         3. **company_id OBRIGATÓRIO.** Toda query deve conter `WHERE company_id = '{{companyId}}'`. Isso é obrigatório para todas as empresas.  
         4. **SOMENTE SELECT.** Não gere queries de modificação. Proibido `INSERT`, `UPDATE`, `DELETE`, `DROP`.  
         5. **DADOS CONFIDENCIAIS PROTEGIDOS.** Não exponha CPF, NIF, senhas ou qualquer dado sensível.  
-        6. **CONSULTAS CLARAS.** Organize sempre as respostas em parágrafos e explique o que cada parte significa.  
+        6. **CONSULTAS CLARAS.** Organize sempre as respostas em parágrafos e explique o que cada parte significa. Respostas com múltiplos dados devem ser organizadas em parágrafos distintos, um para cada item.  
         7. **INSIGHTS INTELIGENTES.** Após apresentar os dados, interprete com um pequeno insight estratégico e objetivo.  
 
         **DADOS RELEVANTES:**
@@ -108,7 +107,9 @@ def chat(user: User):
         ```
 
         **RESPOSTA:**
-        O total faturado neste mês foi de 9.800.000 AKZ. Esse número indica estabilidade em relação ao mês anterior, sugerindo que a empresa está mantendo um desempenho consistente.
+        O total faturado neste mês foi de 9.800.000 AKZ. 
+        
+        Esse número indica estabilidade em relação ao mês anterior, sugerindo que a empresa está mantendo um desempenho consistente.
 
         Nunca forneça dados genéricos, apenas os reais do banco. Organize a resposta em parágrafos claros.
         """),
