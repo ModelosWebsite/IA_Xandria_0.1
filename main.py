@@ -12,7 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from langchain.memory import ConversationBufferMemory
 from langchain_community.utilities import SQLDatabase
 import pymysql
+import os
 
+# Carrega variáveis de ambiente
 load_dotenv()
 
 # Conexão com o banco de dados
@@ -20,41 +22,49 @@ cs = "mysql+mysqlconnector://fortcod1_root:Roa0NGD6l@68.66.220.30:3306/fortcod1_
 db_engine = create_engine(cs)
 db = SQLDatabase(db_engine)
 
-# Inicializa o FastAPI
+# Inicializando o FastAPI
 app = FastAPI()
+
+# Middleware de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Memória de conversação por usuário
+# Memória por empresa (para contexto por company_id)
 conversation_memory = {}
 
+# Modelo de entrada
 class User(BaseModel):
     prompt: str
     company_id: str
 
+# Inicializando o modelo LLM...
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
+# Endpoint principal
 @app.post("/chat")
 def chat(user: User):
     memory_key = f"user_{user.company_id}"
+
+    # Cria memória se ainda não existir
     if memory_key not in conversation_memory:
         conversation_memory[memory_key] = ConversationBufferMemory(
             memory_key="chat_history",
             return_messages=True
         )
-
     memory = conversation_memory[memory_key]
 
+    # Cria toolkit com ferramentas SQL
     sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-    sql_toolkit.get_tools()
+    tools = sql_toolkit.get_tools()  # importante manter o retorno em 'tools'
 
+    # Template de prompt
     prompt = ChatPromptTemplate.from_messages([
-        ("system", f"""
+        ("system", """
         Você é um assistente de IA especialista em:
         - Consultas SQL corretas e seguras;
         - Cálculos matemáticos e estatísticos precisos;
@@ -62,7 +72,7 @@ def chat(user: User):
 
         === REGRAS RÍGIDAS E OBRIGATÓRIAS ===
         1. NUNCA invente informações. Se os dados não existirem, responda: "Infelizmente, não tenho essa informação.".
-        2. SEMPRE filtre as consultas por `WHERE company_id={{company_id}}`.
+        2. SEMPRE filtre as consultas por `WHERE companyid={companyid}`.
         3. NUNCA execute comandos que alterem dados (ex: INSERT, UPDATE, DELETE, DROP).
         4. NÃO exponha dados sensíveis (ex: NIF, senhas, CPF).
         5. SEJA UM GÊNIO EM MATEMÁTICA: seus cálculos devem ser perfeitos — somas, médias, desvios, percentuais, comparações, etc.
@@ -87,7 +97,7 @@ def chat(user: User):
         ```sql
         SELECT SUM(saleTotalPayable) AS total_faturado 
         FROM sales 
-        WHERE company_id={{company_id}} 
+        WHERE companyid={companyid} 
           AND MONTH(created_at) = MONTH(NOW()) 
           AND YEAR(created_at) = YEAR(NOW());
         ```
@@ -102,6 +112,7 @@ def chat(user: User):
         ("user", "{question}\nai:")
     ])
 
+    # Criação do agente com memória e toolkit
     agent = create_sql_agent(
         llm=llm,
         toolkit=sql_toolkit,
@@ -113,7 +124,13 @@ def chat(user: User):
         memory=memory
     )
 
-    response = agent.run(prompt.format_prompt(question=user.prompt, company_id=user.company_id))
+    # Formata o prompt com os dados do usuário
+    formatted_prompt = prompt.format_prompt(question=user.prompt, company_id=user.company_id)
+
+    # Executa o agente com o prompt formatado
+    response = agent.run(formatted_prompt)
+
+    # Salva o contexto da conversa
     memory.save_context({"input": user.prompt}, {"output": response})
 
-    return response
+    return {"resposta": response}
