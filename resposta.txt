@@ -1,8 +1,8 @@
-                                    ASSISTENCIA IA XANDRIA VERSÃO
+                                    XANDRIA ASSISTENT
 Criar uma conta xzero: 
- 1º Clique no botão aderir logo na página incial.
+ 1º Clique no botão "Aderir Agora" logo a página incial.
  2º Preencher as informações. 
- 3º Gravar. 
+ 3º Criar conta.
 
 Adicionar um novo produto:
  1º Clique em produtos.  
@@ -14,12 +14,12 @@ Emitir uma fatura:
  1º Clique em documentos. 
  2º Escolha o tipo de fatura que deseja emitir. 
  3º Escolher o tipo de cliente. 
- 4º No canto superior direito.  
- 5º Preencher os campos NIF e endereço. 
+ 4º Clique no canto superior direito.  
+ 5º Preenche os campos NIF e endereço. 
 
 Criar um cliente no xzero:
  1º Ir no campo contactos 
- 2º Clique no botão adicionar no canto superir direito. 
+ 2º Clique no botão adicionar, no canto superir direito. 
  3º Preencher as informações do cliente.  
 
 Atribuir permissões ao usuário no xzero:

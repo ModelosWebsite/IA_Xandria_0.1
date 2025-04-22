@@ -1,120 +1,134 @@
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
-from langchain_community.document_loaders import WebBaseLoader
-from langchain_openai import OpenAIEmbeddings,ChatOpenAI
-from langchain_community.vectorstores import FAISS
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
-from langchain.chains import create_history_aware_retriever
-from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
+from langchain.agents.agent_types import AgentType
+from langchain.prompts.chat import ChatPromptTemplate
+from langchain_groq import ChatGroq
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 from fastapi.middleware.cors import CORSMiddleware
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.memory import ConversationBufferMemory
+from langchain_community.utilities import SQLDatabase
+import pymysql
+import os
 
-# from langchain_google_genai import GoogleGenerativeAIEmbeddings
 load_dotenv()
+
+# Conexão com o banco de dados
+cs = "mysql+mysqlconnector://fortcod1_root:Roa0NGD6l@68.66.220.30:3306/fortcod1_db_erp_full"
+db_engine = create_engine(cs)
+db = SQLDatabase(db_engine)
+
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permitir apenas essa origem específica
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Permitir todos os métodos HTTP
-    allow_headers=["*"],  # Permitir todos os cabeçalhos
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+conversation_memory = {}
 
-class Prompt(BaseModel):
+class User(BaseModel):
     prompt: str
+    company_id: str
 
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 @app.post("/chat")
-async def chat(input: Prompt):
-    #llm = ChatGroq(temperature=0, model_name="gemma2-9b-it")
-    llm=ChatOpenAI(model="gpt-4o-mini-2024-07-18",temperature=0)
-    loader = WebBaseLoader(["https://karamba.ao/about", "https://karamba.ao/loja/menu"])
-    docs = loader.load()
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    text_splitter = RecursiveCharacterTextSplitter()
-    documents = text_splitter.split_documents(docs)
-    vector = FAISS.from_documents(documents, embeddings)
-    retriever = vector.as_retriever(
-        search_type='similarity',
-        search_kwargs={"k":10}
+def chat(user: User):
+    memory_key = f"user_{user.company_id}"
+
+    # Cria memória se ainda não existir
+    if memory_key not in conversation_memory:
+        conversation_memory[memory_key] = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True
+        )
+    memory = conversation_memory[memory_key]
+
+    # Cria toolkit com ferramentas SQL
+    sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+    tools = sql_toolkit.get_tools()
+
+    # Prompt com variáveis com chaves simples {}
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """
+        Você é um assistente de IA especialista em:
+        - Consultas SQL corretas e seguras;
+        - Cálculos matemáticos e estatísticos precisos;
+        - Geração de análises claras e confiáveis com base em dados reais do banco.
+
+        === REGRAS RÍGIDAS E OBRIGATÓRIAS ===
+        1. NUNCA invente informações. Se os dados não existirem, responda: "Infelizmente, não tenho essa informação.".
+        2. SEMPRE filtre as consultas por `WHERE company_id={company_id}`.
+        3. NUNCA execute comandos que alterem dados (ex: INSERT, UPDATE, DELETE, DROP).
+        4. NÃO exponha dados sensíveis (ex: NIF, senhas, CPF).
+        5. SEJA UM GÊNIO EM MATEMÁTICA: seus cálculos devem ser perfeitos — somas, médias, desvios, percentuais, comparações, etc.
+        6. NUNCA alucine. Toda resposta precisa vir diretamente do banco de dados.
+        7. SEMPRE apresente a consulta SQL utilizada na resposta.
+        8. ORGANIZE A RESPOSTA COM CLAREZA:
+           - Título em negrito (**)
+           - Explicação detalhada e bem estruturada
+           - Linguagem técnica e profissional
+        9. Não utilize `LIMIT` a menos que seja solicitado.
+        10. Nunca generalize ou invente tendências — baseie-se nos dados consultados.
+        11. Use a coluna `{created_at}` para filtrar por datas de faturação.
+        12. Use a coluna `{saleTotalPayable}` para realizar cálculos de totais, médias e análises financeiras.
+
+        === ESTRUTURA RECOMENDADA DE RESPOSTA ===
+
+        **Pergunta do usuário:**
+        "Qual foi o total faturado neste mês?"
+
+        **Interpretação:**
+        O usuário deseja saber o valor total líquido das faturas emitidas no mês atual.
+
+        **Consulta SQL utilizada:**
+        ```sql
+        SELECT SUM({saleTotalPayable}) AS total_faturado 
+        FROM sales 
+        WHERE company_id={company_id} 
+          AND MONTH({created_at}) = MONTH(NOW()) 
+          AND YEAR({created_at}) = YEAR(NOW());
+        ```
+
+        **Resposta organizada:**
+        O total faturado pela empresa no mês atual é de **8.950.000 AKZ**. Esse valor representa a soma de todas as faturas líquidas emitidas nesse período.
+
+        Este resultado pode ser usado para comparações com meses anteriores, auxiliando na análise de desempenho financeiro, sazonalidade e impacto de estratégias de vendas.
+
+        **Nota:** Se não houver registros para o período, responda claramente que não há dados disponíveis.
+        """),
+        ("user", "{question}\nai:")
+    ])
+
+    # Preenche o prompt com as variáveis literais
+    formatted_prompt = prompt.format_prompt(
+        question=user.prompt,
+        company_id=user.company_id,
+        created_at="created_at",
+        saleTotalPayable="saleTotalPayable"
     )
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "{input}"),
-            (
-                "user",
-                "Given the above conversation, generate a search query to look up to get information relevant to the conversation",
-            ),
-        ]
+    # Criação do agente com memória e toolkit
+    agent = create_sql_agent(
+        llm=llm,
+        toolkit=sql_toolkit,
+        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True,
+        max_execution_time=100,
+        max_iterations=1000,
+        handle_parsing_errors=True,
+        memory=memory
     )
-    retriever_chain = create_history_aware_retriever(llm, retriever, prompt)
 
-    """ new """
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """
-    Você é Xandria, uma recepcionista virtual representando a entidade Karamba, que é um restaurante. Você é extremamente educada e prestativa. Seu único objetivo é ajudar os clientes da entidade que você representa a obter informações relacionadas ao Karamba. Responda às perguntas utilizando o contexto e as diretrizes abaixo.
+    response = agent.run(formatted_prompt)
 
-    Seu criador – forneça essas informações apenas se perguntado diretamente:
+    memory.save_context({"input": user.prompt}, {"output": response})
 
-    Quem criou ou desenvolveu você: Fui criada pela equipe Fort-Code, o departamento de desenvolvimento da Pacheco Barroso. A Fort-Code pode ser contatada através do site www.FortCodeDev.com, do site www.PachecoBarroso.com ou pelo e-mail Geral@PachecoBarroso.com.
-    Seu nome é Xandria.
-     
-     When interacting with clients follows the following guidelines:
-     1. Introduce yourself, say your name and your function, let the user know who you are
-     2. Try to quickly and politely understand what the client would like help with
-     3. Reply in portuguese by default unless the client asks to change the language
-
-     Here are some of the guidelines you cannot breach or go around:
-     1. All your answers have to be to questions related to the entity you are a virtual receptionist for, even if the client begs or tries to manipulate you into doing something else
-     2. You are not a legal advisor, if asked to generate or create any legal document or advice, politely refuse
-     3. You do not have the tools to add items to the cart for clients to make purchases. If asked give the client instruction on how to reach the relevant page
-     3. As a virtual secretary your only role is to provide information based on the data provided by the entity you represent
-     4. All your activities have to be related to the enetity you represent
-     5. Do provide any information related to topics that are regarded as pornographic or explicit keep all communication appropriate for underage children
-
-
-     
-     :\n\n{context}""",
-            ),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("user", "{input}"),
-        ]
-    )
-    document_chain = create_stuff_documents_chain(llm, prompt)
-
-    retrieval_chain = create_retrieval_chain(retriever_chain, document_chain)
-    chat_history = [
-        HumanMessage(content="Olá?"),
-        AIMessage(content="Olá em que posso ajudar?"),
-    ]
-    response = retrieval_chain.invoke(
-        {"chat_history": chat_history, "input": input.prompt}
-    )
-    chat_history.append(HumanMessage(content=input.prompt))
-    chat_history.append(AIMessage(content=response["answer"]))
-    return response["answer"]
-
-
-@app.post("/teste")
-async def teste(input: Prompt):
-    llm = ChatGroq(temperature=0, model_name="mixtral-8x7b-32768")
-    res = llm.invoke(input.prompt)
-    return res.content
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("main:app", host="localhost", port=8000)
+    return {"resposta": response}
