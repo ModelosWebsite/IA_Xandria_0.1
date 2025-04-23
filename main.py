@@ -14,7 +14,6 @@ from langchain_community.utilities import SQLDatabase
 import pymysql
 import os
 
-# Carrega variáveis de ambiente
 load_dotenv()
 
 # Conexão com o banco de dados
@@ -22,30 +21,24 @@ cs = "mysql+mysqlconnector://fortcod1_root:Roa0NGD6l@68.66.220.30:3306/fortcod1_
 db_engine = create_engine(cs)
 db = SQLDatabase(db_engine)
 
-# Inicializando o FastAPI
 app = FastAPI()
 
-# Middleware de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Memória por empresa (para contexto por company_id)
 conversation_memory = {}
 
-# Modelo de entrada
 class User(BaseModel):
     prompt: str
     company_id: str
 
-# Inicializando o modelo LLM...
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-# Endpoint principal
 @app.post("/chat")
 def chat(user: User):
     memory_key = f"user_{user.company_id}"
@@ -60,9 +53,9 @@ def chat(user: User):
 
     # Cria toolkit com ferramentas SQL
     sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-    tools = sql_toolkit.get_tools()  # importante manter o retorno em 'tools'
+    tools = sql_toolkit.get_tools()
 
-    # Template de prompt
+    # Prompt com variáveis com chaves simples {}
     prompt = ChatPromptTemplate.from_messages([
         ("system", """
         Você é um assistente de IA especialista em:
@@ -84,6 +77,8 @@ def chat(user: User):
            - Linguagem técnica e profissional
         9. Não utilize `LIMIT` a menos que seja solicitado.
         10. Nunca generalize ou invente tendências — baseie-se nos dados consultados.
+        11. Use a coluna `{created_at}` para filtrar por datas de faturação.
+        12. Use a coluna `{saleTotalPayable}` para realizar cálculos de totais, médias e análises financeiras.
 
         === ESTRUTURA RECOMENDADA DE RESPOSTA ===
 
@@ -95,11 +90,11 @@ def chat(user: User):
 
         **Consulta SQL utilizada:**
         ```sql
-        SELECT SUM(saleTotalPayable) AS total_faturado 
+        SELECT SUM({saleTotalPayable}) AS total_faturado 
         FROM sales 
-        WHERE companyid={companyid} 
-          AND MONTH(created_at) = MONTH(NOW()) 
-          AND YEAR(created_at) = YEAR(NOW());
+        WHERE company_id={companyid} 
+          AND MONTH({created_at}) = MONTH(NOW()) 
+          AND YEAR({created_at}) = YEAR(NOW());
         ```
 
         **Resposta organizada:**
@@ -111,6 +106,14 @@ def chat(user: User):
         """),
         ("user", "{question}\nai:")
     ])
+
+    # Preenche o prompt com as variáveis literais
+    formatted_prompt = prompt.format_prompt(
+        question=user.prompt,
+        company_id=user.company_id,
+        created_at="created_at",
+        saleTotalPayable="saleTotalPayable"
+    )
 
     # Criação do agente com memória e toolkit
     agent = create_sql_agent(
@@ -124,13 +127,8 @@ def chat(user: User):
         memory=memory
     )
 
-    # Formata o prompt com os dados do usuário
-    formatted_prompt = prompt.format_prompt(question=user.prompt, company_id=user.company_id)
-
-    # Executa o agente com o prompt formatado
     response = agent.run(formatted_prompt)
 
-    # Salva o contexto da conversa
     memory.save_context({"input": user.prompt}, {"output": response})
 
     return {"resposta": response}
