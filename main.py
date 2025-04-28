@@ -1,28 +1,30 @@
+import os
 from fastapi import FastAPI
-from pydantic import BaseModel
-from langchain_community.agent_toolkits.sql.base import create_sql_agent
-from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
-from langchain.agents.agent_types import AgentType
-from langchain.prompts.chat import ChatPromptTemplate
-from langchain_groq import ChatGroq
-from sqlalchemy import create_engine
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from pydantic import BaseModel
+from dotenv import load_dotenv
 from langchain.memory import ConversationBufferMemory
 from langchain_community.utilities import SQLDatabase
-import pymysql 
-import os
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langchain.tools import tool
+from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
 
+# Carrega variáveis de ambiente
 load_dotenv()
 
-# Conexão com o banco de dados
-cs = "mysql+mysqlconnector://fortcod1_root:Roa0NGD6l@68.66.220.30:3306/fortcod1_db_erp_full"
-db_engine = create_engine(cs)
-db = SQLDatabase(db_engine)
+# Configuração do banco com SQLAlchemy síncrono
+DATABASE_URL = "mysql+pymysql://fortcod1_root:Roa0NGD6l@68.66.220.30:3306/fortcod1_db_erp_full"
+engine = create_engine(DATABASE_URL, echo=False)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Inicializa o FastAPI
 app = FastAPI()
 
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,104 +33,112 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-conversation_memory = {}
-
+# Classe do corpo da requisição
 class User(BaseModel):
     prompt: str
-    company_id: str
+    companyid: str
 
+# Conversas por empresa (memória)
+conversation_memory = {}
+
+# Instanciando a LLM
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
+# Ferramentas personalizadas
+@tool
+def documentation_tool(url: str, question: str) -> str:
+    """Tool para extrair documentação de uma URL e responder perguntas sobre ela."""
+    return f"[Mock] Resposta da documentação para a pergunta: {question}"
+
+@tool
+def black_formatter_tool(path: str) -> str:
+    """Tool para formatar arquivos Python usando Black."""
+    try:
+        os.system(f"black {path}")
+        return "Formatado com sucesso!"
+    except Exception as e:
+        return f"Erro ao formatar: {str(e)}"
+
+# Prompt com regras de segurança e contexto
+# Prompt mais humanizado e com insights
+prompt = ChatPromptTemplate.from_messages([
+    ("system", """
+    Você é um assistente de Inteligência Artificial especializado em:
+    - Consultas SQL precisas e seguras;
+    - Cálculos matemáticos e estatísticos corretos;
+    - Geração de análises claras, profundas, humanas e bem estruturadas em português formal.
+
+    === REGRAS OBRIGATÓRIAS ===
+    1. Sempre interprete cuidadosamente a pergunta do usuário.
+    2. Se a pergunta for sobre **faturas**, use a tabela `sales`, especialmente:
+        - `created_at` para datas de faturação.
+        - `saleTotalPayable` para valores faturados.
+    3. Se a pergunta for sobre **interações**, use a tabela `interactions`.
+    4. Realize cálculos de forma precisa (somas, médias, percentuais, etc.).
+    5. NUNCA invente dados. Se não existirem registros, diga: "Nenhum registro encontrado para essa consulta."
+    6. Não exponha dados sensíveis como NIF, CPF, senhas ou informações pessoais.
+    7. Sempre redija as respostas de forma clara, formal e acolhedora.
+    8. Baseie as respostas exclusivamente nos dados do banco de dados.
+    9. Apresente análises profundas, oferecendo **insights inteligentes e úteis** em cada resposta.
+
+    === COMO RESPONDER ===
+    - Comece com um resumo direto do resultado (em tom acolhedor e humano).
+    - Logo depois, ofereça **pelo menos um insight** relevante baseado nos dados encontrados.
+    - Use expressões que demonstrem empatia e inteligência, como:
+        "Isso sugere que...", "Pode ser interessante considerar...", "Uma possível interpretação é...", "Vale a pena analisar...".
+    - Escreva de maneira formal, mas próxima do usuário, como um consultor experiente faria.
+    - Evite respostas frias e técnicas demais. Seja claro, inteligente e humano.
+    - Caso não existam dados para a consulta, responda gentilmente: "Nenhum registro encontrado para essa consulta. Caso necessário, podemos explorar outros períodos ou categorias."
+
+    === EXEMPLO DE RESPOSTA ===
+    **Resumo do Faturamento no Mês Atual**
+
+    O total faturado pela empresa no mês de abril foi de **8.950.000 AKZ**.
+
+    **Insight**: Esse valor indica uma forte atividade comercial no período. Pode ser interessante analisar quais categorias de produtos ou serviços mais contribuíram para este resultado, visando estratégias de expansão.
+
+    **Nota**: Se desejar, posso ajudar a detalhar ainda mais a origem desse faturamento.
+
+    === INSTRUÇÕES IMPORTANTES ===
+    - A consulta SQL deve ser usada internamente para gerar a resposta correta, mas **não deve ser exibida ao usuário**, a menos que ele peça explicitamente.
+    - Foque sempre na clareza, segurança e profundidade das respostas.
+    """),
+    MessagesPlaceholder(variable_name="chat_history", optional=True),
+    ("human", "{input}"),
+    MessagesPlaceholder(variable_name="agent_scratchpad"),
+])
+
+# Inicializa o SQLDatabase síncrono
+db_sync = SQLDatabase(engine)
+
+# Toolkit e Agente
+sql_toolkit = SQLDatabaseToolkit(db=db_sync, llm=llm)
+toolkit = sql_toolkit.get_tools() + [documentation_tool, black_formatter_tool]
+agent = create_openai_functions_agent(llm=llm, tools=toolkit, prompt=prompt)
+agent_executor = AgentExecutor(agent=agent, tools=toolkit, verbose=True)
+
+# Rota principal (agora síncrona também)
 @app.post("/chat")
 def chat(user: User):
-    memory_key = f"user_{user.company_id}"
+    memory_key = f"user_{user.companyid}"
 
-    # Cria memória se ainda não existir
+    # Se não existir memória para o usuário/empresa, cria
     if memory_key not in conversation_memory:
         conversation_memory[memory_key] = ConversationBufferMemory(
             memory_key="chat_history",
             return_messages=True
         )
+
     memory = conversation_memory[memory_key]
 
-    # Cria toolkit com ferramentas SQL
-    sql_toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-    tools = sql_toolkit.get_tools()
+    # Execução do agente
+    response = agent_executor.invoke({
+        "input": user.prompt,
+        "chat_history": memory.chat_memory.messages,
+        "companyid": user.companyid
+    })
 
-    # Prompt com variáveis com chaves simples {}
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """
-Você é um assistente de IA especializado em:
+    # Atualiza o histórico da conversa
+    memory.save_context({"input": user.prompt}, {"output": response["output"]})
 
-- Consultas SQL corretas e seguras com base em um banco de dados MySQL;
-- Análises matemáticas e estatísticas precisas;
-- Geração de respostas organizadas, com base apenas nos dados reais do banco.
-
-INSTRUÇÕES RIGOROSAS E OBRIGATÓRIAS
-
-1. ORGANIZE A RESPOSTA COM CLAREZA:
-           - Título em negrito (**)
-           - Explicação detalhada e bem estruturada
-           - Linguagem técnica e profissional
-
-2. NUNCA invente dados. Se não encontrar a informação no banco, diga: "Infelizmente, não tenho essa informação."
-3. TODAS as consultas devem conter obrigatoriamente o filtro `WHERE company_id = {companyid}`.
-4. NUNCA utilize comandos que alteram o banco (INSERT, UPDATE, DELETE, DROP, etc).
-5. NUNCA exponha informações sensíveis como CPF, NIF ou senhas.
-6. Use SEMPRE a tabela `sales` para dados de faturação.
-7. Use SEMPRE a coluna `created_at` para todas as consultas relacionadas a **datas de faturas**.
-8. Use SEMPRE a coluna `saleTotalPayable` para todos os cálculos de **valores financeiros** (somas, médias, totais, etc).
-9. NÃO utilize `LIMIT` nas consultas, exceto quando for explicitamente solicitado pelo usuário.
-10. TODA resposta deve apresentar a **consulta SQL utilizada**.
-11. NÃO generalize tendências. Só descreva o que realmente está nos dados.
-
-ESTRUTURA DA TABELA `sales`
-- `created_at` (DATETIME): data da emissão da fatura
-- `saleTotalPayable` (DECIMAL): valor total líquido da fatura
-- `company_id` (INT): ID da empresa responsável pela fatura
-
-EXEMPLO DE PERGUNTA E RESPOSTA CORRETA
-
-**Pergunta do usuário:**
-"Qual foi o total faturado neste mês?"
-
-**Interpretação:**
-O usuário deseja saber o valor total líquido das faturas emitidas no mês atual pela empresa.
-
-**Consulta SQL utilizada:**
-```sql
-SELECT SUM(saleTotalPayable) AS total_faturado
-FROM sales
-WHERE company_id = {companyid}
-  AND MONTH(created_at) = MONTH(NOW())
-  AND YEAR(created_at) = YEAR(NOW());
-        **Nota:** Se não houver registros para o período, responda claramente que não há dados disponíveis.
-        """),
-        ("user", "{question}\nai:")
-    ])
-
-    # Preenche o prompt com as variáveis literais
-    formatted_prompt = prompt.format_prompt(
-        question=user.prompt,
-        company_id=user.company_id,
-        created_at="created_at",
-        saleTotalPayable="saleTotalPayable"
-    )
-
-    # Criação do agente com memória e toolkit
-    agent = create_sql_agent(
-        llm=llm,
-        toolkit=sql_toolkit,
-        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True,
-        max_execution_time=100,
-        max_iterations=1000,
-        handle_parsing_errors=True,
-        memory=memory
-    )
-
-    response = agent.run(formatted_prompt)
-
-    memory.save_context({"input": user.prompt}, {"output": response})
-
-    return {"resposta": response}
+    return {"resposta": response["output"]}
