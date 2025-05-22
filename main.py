@@ -29,7 +29,7 @@ app = FastAPI()
 # Middleware CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://xzero.ao", "http://192.168.100.89:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
