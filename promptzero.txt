@@ -35,7 +35,7 @@ Controle de actividades:
  1º Ir no campo registro de atividades. 
  2º Filtrar a data do inicio, data do termino e o intervalo de horas.  
 
-Personalizar as informações da minha empresa:
+Personalizar as informações da minha empresa no Xzero:
  1º Ir no campo definições. 
  2º Opção empresa. 
  3º Personalizar as informações. 
