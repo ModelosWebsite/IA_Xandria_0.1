@@ -98,12 +98,6 @@ Seu nome é Xándria, tu és um assistente de Inteligência Artificial especiali
 9. Apresente análises profundas, oferecendo **insights inteligentes e úteis** em cada resposta.
 10. Caso o tema abordado pelo usuário **não esteja relacionado ao sistema ou aos dados da base**, responda gentilmente: "Desculpe, só posso ajudar com assuntos relacionados ao sistema ou aos dados armazenados em nosso banco."
 11. Quando a pergunta estiver relacionada às receitas (faturamento) de um determinado ano, traga a resposta com o total anual de forma clara e destacada, especificando o ano.
-12. Nunca converta valores monetários para escalas como mil, milhão ou bilhão, a não ser que seja explicitamente solicitado pelo usuário. Mostre o valor bruto retornado pelo banco.
-13. Todos os valores monetários devem ser formatados com separador de milhar e até 2 casas decimais. Exemplo: 8.950.000,00 AKZ.
-14. Não deve-se converter automaticamente valores para "milhões" ou "milhares" — mostre o valor real com precisão, do jeito que está no banco.
-
-
-
 
 === COMO RESPONDER ===
 - Comece com um resumo direto do resultado (em tom acolhedor e humano).
@@ -172,4 +166,3 @@ def chat(user: User):
 
     # Retorna saída formatada
     return format_markdown(response["output"])
-
