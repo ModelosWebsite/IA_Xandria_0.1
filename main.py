@@ -54,7 +54,7 @@ def documentation_tool(url: str, question: str) -> str:
 
 @tool
 def black_formatter_tool(path: str) -> str:
-    """Tool para formatar arquivos Python usando Black."""
+    """Tool para formatar arquivos Python usando Black"""
     try:
         os.system(f"black {path}")
         return "Formatado com sucesso!"
