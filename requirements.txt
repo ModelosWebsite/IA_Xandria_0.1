@@ -10,4 +10,8 @@ langchain-openai
 langchain-core
 openai
 black
+uvicorn[standard]
+langchain-groq
+mysqlclient
+
 :
