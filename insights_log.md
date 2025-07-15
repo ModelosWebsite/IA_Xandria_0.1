@@ -48,3 +48,7 @@ Sem mais dados financeiros, não é possível identificar tendências ou alertas
 A empresa em questão é a Pacheco Barroso Prestação de serviço LDA, com o NIF **5001048759**. 
 Não há informações financeiras disponíveis para análise de tendências ou valores. 
 O foco aqui está na identificação da empresa e seu número de identificação fiscal.
+
+---
+A empresa em questão é a Pacheco Barroso Prestação de serviço LDA, com o NIF **5001048759**. 
+Sem mais dados financeiros, não é possível identificar tendências ou alertas.
