@@ -21,7 +21,6 @@ def fetch_schema_info():
     """
     with engine.connect() as conn:
         result = conn.execute(text(query)).fetchall()
-
     schema = {}
     for table, column in result:
         schema.setdefault(table, []).append(column)
