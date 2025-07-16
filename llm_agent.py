@@ -45,7 +45,7 @@ Nunca deixe o campo `company_companyid` solto, sempre especifique a tabela, como
 Se a pergunta não puder ser respondida com as tabelas listadas, retorne uma SQL vazia.
 Nunca tente adivinhar o nome de tabelas ou campos.
 Nunca use tabelas como `s`, `t`, `u`, `x`, `dados`, `informacao`, ou outras que não estejam no schema.
-
+⚠️ Para perguntas como “liste ou quais são os produtos da empresa”, use a tabela `products` e selecione as colunas `productdescription` e `productprice`.
 ⚠️ Não use subqueries a menos que seja absolutamente necessário.
 ⚠️ Não utilize alias como `s`, `a`, `t` se eles não forem definidos explicitamente no FROM.
 ⚠️ Sempre escreva consultas simples, diretas e claras.

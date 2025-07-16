@@ -162,3 +162,18 @@ def resposta_inteligente(prompt, resultado):
         return texto
 
     return str(resultado)
+
+def formatar_produtos(linhas):
+    if not linhas:
+        return "Nenhum produto encontrado para esta empresa."
+
+    texto = f"Existem <strong>{len(linhas)}</strong> produtos cadastrados.<br><br>"
+    texto += "<ul>"
+    for linha in linhas[:15]:  # mostra os 15 primeiros
+        descricao = linha[0] if linha[0] else "Sem nome"
+        preco = linha[1] if linha[1] else 0
+        preco_formatado = f"{float(preco):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " Kz"
+        texto += f"<li><strong>{descricao}</strong>: {preco_formatado}</li>"
+    texto += "</ul>"
+
+    return texto

@@ -13,7 +13,8 @@ from utils import (
     formatar_faturas,
     formatar_meses,
     resposta_inteligente,
-    resposta_numerica_inteligente
+    resposta_numerica_inteligente,
+    formatar_produtos
 )
 import re
 
@@ -42,17 +43,20 @@ def gerar_output_formatado(sub_prompt: str, resultado_bruto):
             return formatar_faturas_unicas(resultado_bruto)
         if colunas >= 9:
             return formatar_faturas(resultado_bruto)
+
     if resultado_bruto and isinstance(resultado_bruto[0][0], int):
         possiveis_meses = [int(r[0]) for r in resultado_bruto]
         if all(1 <= m <= 12 for m in possiveis_meses):
             return format_markdown(formatar_meses(resultado_bruto))
+
+    # NOVO: resposta de produtos se vier 2 colunas: (descricao, preco)
+    if "produt" in sub_prompt.lower() and len(resultado_bruto[0]) == 2:
+        return format_markdown(formatar_produtos(resultado_bruto))
+
     output = resposta_numerica_inteligente(sub_prompt, resultado_bruto)
     if not output:
         output = resposta_inteligente(sub_prompt, resultado_bruto)
     return format_markdown(output) if isinstance(output, str) else output
-
-def _render_html(output: str, insight: str | None = None) -> str:
-    return f"{output}<br><br>{insight}" if insight else output
 
 @app.post("/chat", response_class=HTMLResponse)
 def chat(req: ChatRequest):
@@ -78,3 +82,9 @@ def chat(req: ChatRequest):
 
     insight = generate_and_persist(req.prompt, resultado_bruto)
     return _render_html(output, insight)
+
+def _render_html(resposta, insight=None):
+    if insight:
+        resposta += f"<br><br><hr><small>Insight salvo com ID: {insight}</small>"
+    return resposta
+
