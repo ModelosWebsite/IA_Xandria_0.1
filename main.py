@@ -78,34 +78,3 @@ def chat(req: ChatRequest):
 
     insight = generate_and_persist(req.prompt, resultado_bruto)
     return _render_html(output, insight)
-
-@app.post("/chat/multi", response_class=HTMLResponse)
-def chat_multi(req: ChatRequest):
-    schema = fetch_schema_info()
-    sub_perguntas = dividir_perguntas(req.prompt)
-
-    respostas: List[str] = []
-    insights: List[str] = []
-
-    for sub in sub_perguntas:
-        prompt_llm = build_prompt(sub, schema, req.companyid)
-        sql = gerar_sql(prompt_llm)
-
-        if not sql.lower().startswith("select"):
-            respostas.append(format_markdown(f"SQL inválida para '{sub}'"))
-            insights.append(f"Não foi possível gerar insight para '{sub}'.")
-            continue
-
-        resultado = execute_sql(sql, raw=True)
-        resultado = [tuple(r) for r in resultado]
-
-        output = gerar_output_formatado(sub, resultado)
-        respostas.append(output)
-
-        insight = generate_and_persist(sub, resultado)
-        insights.append(insight)
-
-    output_final = "<br><br>".join(respostas)
-    insight_final = "<br><br>".join(insights)
-
-    return _render_html(output_final, insight_final)
