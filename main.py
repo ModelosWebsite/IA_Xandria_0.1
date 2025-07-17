@@ -58,6 +58,11 @@ def gerar_output_formatado(sub_prompt: str, resultado_bruto):
         output = resposta_inteligente(sub_prompt, resultado_bruto)
     return format_markdown(output) if isinstance(output, str) else output
 
+def _render_html(resposta, insight=None):
+    if insight:
+        resposta += f"<br><br><hr><small>{insight}</small>"
+    return resposta
+
 @app.post("/chat", response_class=HTMLResponse)
 def chat(req: ChatRequest):
     schema = fetch_schema_info()
@@ -82,9 +87,3 @@ def chat(req: ChatRequest):
 
     insight = generate_and_persist(req.prompt, resultado_bruto)
     return _render_html(output, insight)
-
-def _render_html(resposta, insight=None):
-    if insight:
-        resposta += f"<br><br><hr><small>Insight salvo com ID: {insight}</small>"
-    return resposta
-

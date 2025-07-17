@@ -70,11 +70,20 @@ def _normalize_currency(text: str) -> str:
 
 def build_insight(user_prompt: str, sql_result: List[Any]) -> str:
     """Gera texto de insight curto (máx 4–5 linhas) via LLM."""
+    
+    # 🔒 Proteção contra alucinação com meses simples
+    if sql_result and isinstance(sql_result[0], (tuple, list)):
+        colunas = len(sql_result[0])
+        if colunas == 1:
+            valores = [r[0] for r in sql_result]
+            if all(isinstance(v, int) and 1 <= v <= 12 for v in valores):
+                return "Os dados mostram os meses com faturação, mas sem valores associados para análise aprofundada."
+
     table_md = _to_markdown_table(sql_result)
 
     insight_prompt = f"""
 Você é um analista financeiro experiente em Angola. Com base na **pergunta** e nos **dados** abaixo,
-redija um insight conciso (3‑4 linhas), em português, destacando tendências, picos, quedas ou alertas.
+redija um insight conciso (2‑3 linhas), em português, destacando tendências, picos, quedas ou alertas.
 Quando mencionar valores, escreva o número seguido de **“ Kz”** (com espaço antes). Nunca use R$, USD ou outras moedas.
 Digite apenas o texto do insight.
 
@@ -87,7 +96,6 @@ Digite apenas o texto do insight.
     response = llm.invoke(insight_prompt)
     raw_insight = response.content.strip()
     return _normalize_currency(raw_insight)
-
 
 def save_insight(insight: str, separator: bool = True) -> None:
     """Anexa o insight ao arquivo markdown de histórico."""

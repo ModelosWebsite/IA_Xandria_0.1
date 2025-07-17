@@ -76,3 +76,46 @@ A empresa oferece diversos produtos e serviços, com destaque para **Kytutes (Ka
 
 ---
 A empresa oferece diversos produtos e serviços, com destaque para **Kytutes (Karamba)** com **1 693 000.00 Kz**, **Salário Karamba** com **1 547 569.52 Kz** e **Empresa de Segurança PA** com **559 000.00 Kz**. Serviços de **Coworking** também são oferecidos em diferentes modalidades. Os valores variam significativamente, indicando diferentes níveis de investimento e possibly diferentes segmentos de mercado.
+
+---
+Em 2024, os meses de faturamento com maior destaque foram Dezembro (**12 Kz**), Novembro (**11 Kz**) e Outubro (**10 Kz**), sugerindo um aumento gradual ao longo do trimestre. Esta tendência pode indicar uma recuperação econômica ou sazonalidade positiva no período. É importante monitorar se este crescimento se manterá nos próximos períodos.
+
+---
+A empresa em questão é a Pacheco Barroso, com o NIF **50010487590**. 
+Sem dados financeiros ou de mercado associados à empresa, não é possível efectuar análises adicionais. 
+Recomenda-se o fornecimento de mais informações para uma análise financeira mais detalhada. 
+A informação actualmente disponível não permite identificar tendências ou alertas financeiros.
+
+---
+A empresa em questão é a Pacheco Barroso Prestação de serviço LDA, com o NIF **5001048759**. 
+Sem dados financeiros ou de mercado, não é possível identificar tendências ou alertas.
+
+---
+A análise dos dados de faturamento de 2024 revela que os meses com registros de vendas são janeiro, fevereiro, março, abril, maio, junho, julho e agosto. O pico de faturamento ocorreu nos meses de **março** e **julho** com **8** vendas cada. Em contrapartida, os meses de **fevereiro**, **abril**, **maio**, **junho** e **agosto** apresentaram **1** venda cada, indicando uma queda significativa. Esses dados sugerem uma tendência de concentração de vendas nos primeiros e segundos trimestres do ano.
+
+---
+Em 2024, os meses de faturamento com maior destaque foram Dezembro (**12 Kz**), Novembro (**11 Kz**) e Outubro (**10 Kz**), sugerindo um aumento gradual ao longo do trimestre. Esta tendência pode indicar uma recuperação econômica ou sazonalidade positiva no período. É importante monitorar se este crescimento se manterá nos próximos períodos.
+
+---
+Em 2024, os meses de faturamento com maior destaque foram Dezembro (**12 Kz**), Novembro (**11 Kz**) e Outubro (**10 Kz**), sugerindo um aumento gradual ao longo do trimestre. Esta tendência pode indicar uma recuperação econômica ou sazonalidade positiva no período. É importante monitorar se este crescimento se manterá nos próximos períodos.
+
+---
+Em 2024, os meses de faturamento com maior destaque foram Dezembro (**12 Kz**), Novembro (**11 Kz**) e Outubro (**10 Kz**), sugerindo um aumento gradual ao longo do trimestre. Esta tendência pode indicar uma recuperação econômica ou sazonalidade positiva no período. É importante monitorar se este crescimento se manterá nos próximos períodos.
+
+---
+Em 2024, os meses de faturamento com maior destaque foram Dezembro (**12 Kz**), Novembro (**11 Kz**) e Outubro (**10 Kz**), sugerindo um aumento gradual ao longo do trimestre. Esta tendência pode indicar uma recuperação econômica ou sazonalidade positiva no período. É importante monitorar se este crescimento se manterá nos próximos períodos.
+
+---
+Os dados mostram os meses com faturação, mas sem valores associados para análise aprofundada.
+
+---
+Os dados mostram os meses com faturação, mas sem valores associados para análise aprofundada.
+
+---
+Os dados mostram os meses com faturação, mas sem valores associados para análise aprofundada.
+
+---
+O valor total faturado entre Outubro de 2024 e Julho de 2025 é de **221 976 Kz**. Este valor representa uma informação pontual, não sendo possível identificar tendências sem mais dados. É necessário comparar com períodos anteriores para uma análise mais aprofundada.
+
+---
+O valor total faturado de Outubro de 2024 até Julho de 2025 é de **221 976 Kz**. Este valor representa uma informação pontual, sem dados comparativos para identificar tendências. É necessário mais informação para uma análise mais aprofundada.
