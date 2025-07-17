@@ -1,0 +1,42 @@
+Welcome to Ubuntu 24.04 LTS (GNU/Linux 6.8.0-31-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Thu Jul 17 09:50:35 UTC 2025
+
+  System load:  0.0                Processes:             106
+  Usage of /:   31.0% of 23.17GB   Users logged in:       0
+  Memory usage: 50%                IPv4 address for eth0: 167.99.143.216
+  Swap usage:   0%                 IPv4 address for eth0: 10.19.0.5
+
+Expanded Security Maintenance for Applications is not enabled.
+
+187 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+
+*** System restart required ***
+Last login: Wed Jul 16 09:14:23 2025 from 162.243.188.66
+root@ai-xandria:~# ls
+IA_Xandria_0.1  Xzero
+root@ai-xandria:~# cd IA_Xandria_0.1
+root@ai-xandria:~/IA_Xandria_0.1# cat /etc/systemd/system/xandria.service
+[Unit]
+Description=Xandria FastAPI Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/IA_Xandria_0.1
+ExecStart=/root/IA_Xandria_0.1/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
+Restart=always
+RestartSec=5
+Environment=PATH=/root/IA_Xandria_0.1/venv/bin
+
+[Install]
+WantedBy=multi-user.target
